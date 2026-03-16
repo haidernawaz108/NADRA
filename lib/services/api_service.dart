@@ -1,239 +1,126 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
-
-/// Base URL of your XAMPP server.
-/// Change to your PC's IP if testing on a physical device.
-const String _base = 'http://localhost/nadra_api';
+import 'database_service.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
-  // ─── Cached stats for quick access ──────────────────────────
-  Map<String, dynamic> _stats = {};
-  Map<String, dynamic> get cachedStats => _stats;
-
-  // ─── HEADERS ────────────────────────────────────────────────
-  Map<String, String> get _headers => {'Content-Type': 'application/json'};
-
-  // ═══════════════════════════════════════════════════════════
-  //  STAFF
-  // ═══════════════════════════════════════════════════════════
+  final _db = DatabaseService();
+  Future<void> _init() => _db.initialize();
 
   Future<StaffModel?> authenticateStaff(String staffId, String password) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_base/staff.php'),
-        headers: _headers,
-        body: jsonEncode({'staff_id': staffId, 'password': password}),
-      );
-      if (res.statusCode == 200) {
-        return StaffModel.fromJson(jsonDecode(res.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init(); return _db.authenticateStaff(staffId, password);
   }
-
-  Future<List<StaffModel>> getAllStaff() async {
-    try {
-      final res = await http.get(Uri.parse('$_base/staff.php'));
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        return data.map((e) => StaffModel.fromJson(e)).toList();
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  //  USERS — READ
-  // ═══════════════════════════════════════════════════════════
 
   Future<List<UserModel>> getAllUsers({String status = 'All'}) async {
-    try {
-      final uri = Uri.parse('$_base/users.php').replace(
-        queryParameters: status == 'All' ? {} : {'status': status},
-      );
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        return data.map((e) => UserModel.fromJson(e)).toList();
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
+    await _init(); return _db.filterByStatus(status);
   }
 
   Future<UserModel?> getUserById(String id) async {
-    try {
-      final res = await http.get(Uri.parse('$_base/users.php?id=$id'));
-      if (res.statusCode == 200) return UserModel.fromJson(jsonDecode(res.body));
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init(); return _db.getUserById(id);
   }
 
   Future<UserModel?> getUserByCnic(String cnic) async {
-    try {
-      final res = await http.get(Uri.parse('$_base/users.php?cnic=${Uri.encodeComponent(cnic)}'));
-      if (res.statusCode == 200) return UserModel.fromJson(jsonDecode(res.body));
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init(); return _db.getUserByCnic(cnic);
   }
 
   Future<UserModel?> getUserByTracking(String tracking) async {
-    try {
-      final res = await http.get(Uri.parse('$_base/users.php?tracking=${Uri.encodeComponent(tracking)}'));
-      if (res.statusCode == 200) return UserModel.fromJson(jsonDecode(res.body));
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init(); return _db.getUserByTrackingId(tracking);
   }
 
   Future<List<UserModel>> searchUsers(String query, {String status = 'All'}) async {
-    try {
-      final params = <String, String>{'search': query};
-      if (status != 'All') params['status'] = status;
-      final uri = Uri.parse('$_base/users.php').replace(queryParameters: params);
-      final res = await http.get(uri);
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        return data.map((e) => UserModel.fromJson(e)).toList();
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
+    await _init();
+    var r = _db.searchUsers(query);
+    if (status != 'All') r = r.where((u) => u.appStatus == status).toList();
+    return r;
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  USERS — WRITE
-  // ═══════════════════════════════════════════════════════════
-
   Future<UserModel?> createUser(Map<String, dynamic> data) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_base/users.php'),
-        headers: _headers,
-        body: jsonEncode(data),
-      );
-      if (res.statusCode == 200 || res.statusCode == 201) {
-        return UserModel.fromJson(jsonDecode(res.body));
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init();
+    final user = UserModel(
+      id:             'new_${DateTime.now().millisecondsSinceEpoch}',
+      cnic:           data['cnic'] ?? UserModel.generateCnic(),
+      name:           data['name'] ?? '',
+      fatherName:     data['father_name'] ?? '',
+      dob:            data['dob'] ?? '',
+      gender:         data['gender'] ?? 'Male',
+      bloodGroup:     data['blood_group'] ?? 'O+',
+      address:        data['address'] ?? '',
+      city:           data['city'] ?? '',
+      province:       data['province'] ?? 'Punjab',
+      mobile:         data['mobile'] ?? '',
+      email:          data['email'] ?? '',
+      religion:       data['religion'] ?? 'Islam',
+      profession:     data['profession'] ?? '',
+      status:         'Active',
+      cnicExpiry:     data['cnic_expiry'] ?? '2034-01-01',
+      appStatus:      'Submitted',
+      trackingId:     data['tracking_id'] ?? 'TRK-${DateTime.now().year}-${(DateTime.now().millisecondsSinceEpoch % 9999).toString().padLeft(4,'0')}',
+      registeredDate: data['registered_date'] ?? DateTime.now().toString().substring(0, 10),
+      password:       '',               // blank until citizen activates
+      accountStatus:  'pre_registered', // IMPORTANT: staff-created record
+    );
+    final ok = await _db.addUser(user);
+    return ok ? user : null;
   }
 
   Future<UserModel?> updateUser(String id, Map<String, dynamic> data) async {
-    try {
-      final res = await http.put(
-        Uri.parse('$_base/users.php?id=$id'),
-        headers: _headers,
-        body: jsonEncode(data),
-      );
-      if (res.statusCode == 200) return UserModel.fromJson(jsonDecode(res.body));
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init();
+    final old = _db.getUserById(id);
+    if (old == null) return null;
+    final updated = UserModel(
+      id: old.id, cnic: data['cnic'] ?? old.cnic,
+      name: data['name'] ?? old.name, fatherName: data['father_name'] ?? old.fatherName,
+      dob: data['dob'] ?? old.dob, gender: data['gender'] ?? old.gender,
+      bloodGroup: data['blood_group'] ?? old.bloodGroup,
+      address: data['address'] ?? old.address, city: data['city'] ?? old.city,
+      province: data['province'] ?? old.province, mobile: data['mobile'] ?? old.mobile,
+      email: data['email'] ?? old.email, religion: data['religion'] ?? old.religion,
+      profession: data['profession'] ?? old.profession,
+      status: old.status, cnicExpiry: old.cnicExpiry,
+      appStatus: data['app_status'] ?? old.appStatus,
+      trackingId: old.trackingId, registeredDate: old.registeredDate,
+      password: old.password, accountStatus: old.accountStatus,
+    );
+    return await _db.updateUser(updated) ? updated : null;
   }
 
   Future<bool> updateAppStatus(String userId, String newStatus) async {
-    final result = await updateUser(userId, {'app_status': newStatus});
-    return result != null;
+    await _init(); return _db.updateAppStatus(userId, newStatus);
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  FEEDBACK
-  // ═══════════════════════════════════════════════════════════
-
   Future<List<FeedbackModel>> getAllFeedback() async {
-    try {
-      final res = await http.get(Uri.parse('$_base/feedback.php'));
-      if (res.statusCode == 200) {
-        final List data = jsonDecode(res.body);
-        return data.map((e) => FeedbackModel.fromJson(e)).toList();
-      }
-      return [];
-    } catch (_) {
-      return [];
-    }
+    await _init(); return _db.feedback;
   }
 
   Future<bool> addFeedback(Map<String, dynamic> data) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_base/feedback.php'),
-        headers: _headers,
-        body: jsonEncode(data),
-      );
-      return res.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
+    await _init();
+    return _db.addFeedback(FeedbackModel(
+      id:      'fb_${DateTime.now().millisecondsSinceEpoch}',
+      userId:  data['user_id'] ?? '',
+      rating:  data['rating'] is int ? data['rating'] : int.tryParse(data['rating'].toString()) ?? 5,
+      comment: data['comment'] ?? '',
+      date:    data['date'] ?? DateTime.now().toString().substring(0, 10),
+    ));
   }
-
-  // ═══════════════════════════════════════════════════════════
-  //  STATS
-  // ═══════════════════════════════════════════════════════════
 
   Future<Map<String, dynamic>> getStats() async {
-    try {
-      final res = await http.get(Uri.parse('$_base/stats.php'));
-      if (res.statusCode == 200) {
-        _stats = jsonDecode(res.body);
-        return _stats;
-      }
-      return {};
-    } catch (_) {
-      return {};
-    }
+    await _init(); return _db.getStats();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  TOKEN GENERATION
-  // ═══════════════════════════════════════════════════════════
-
-  /// [userIdentifier] can be a user ID or CNIC
   Future<Map<String, dynamic>?> generateToken(String userIdentifier) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$_base/stats.php'),
-        headers: _headers,
-        body: jsonEncode({'user_id': userIdentifier}),
-      );
-      if (res.statusCode == 200) return jsonDecode(res.body);
-      return null;
-    } catch (_) {
-      return null;
-    }
+    await _init();
+    UserModel? user = _db.getUserByCnic(userIdentifier) ?? _db.getUserById(userIdentifier);
+    if (user == null) return null;
+    final now = DateTime.now();
+    return {
+      'token':    'T${(now.millisecondsSinceEpoch % 10000).toString().padLeft(4,'0')}',
+      'userName': user.name,
+      'cnic':     user.cnic,
+      'time':     '${now.hour.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')}',
+    };
   }
 
-  // ═══════════════════════════════════════════════════════════
-  //  CONNECTIVITY CHECK
-  // ═══════════════════════════════════════════════════════════
-
-  Future<bool> checkConnection() async {
-    try {
-      final res = await http
-          .get(Uri.parse('$_base/stats.php'))
-          .timeout(const Duration(seconds: 5));
-      return res.statusCode == 200;
-    } catch (_) {
-      return false;
-    }
-  }
+  Future<bool> checkConnection() async => true;
 }

@@ -7,6 +7,7 @@ import '../../utils/app_theme.dart';
 import '../login_screen.dart';
 import 'users_list_screen.dart';
 import 'supervisor_dashboard.dart';
+import 'staff_register_citizen_screen.dart';
 
 class StaffHome extends StatefulWidget {
   const StaffHome({super.key});
@@ -180,6 +181,36 @@ class _ReceptionistDashboardState extends State<_ReceptionistDashboard> {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textPrimary)),
             const SizedBox(height: 12),
 
+            // ── Primary action: Register new citizen ──
+            InkWell(
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const StaffRegisterCitizenScreen())),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                      colors: [AppTheme.primary, AppTheme.primaryLight],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3),
+                      blurRadius: 8, offset: const Offset(0, 3))],
+                ),
+                child: const Row(children: [
+                  Icon(Icons.person_add, color: Colors.white, size: 24),
+                  SizedBox(width: 14),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('Register New Citizen', style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15)),
+                    SizedBox(height: 2),
+                    Text('Fill bay-form & assign CNIC number',
+                        style: TextStyle(color: Colors.white70, fontSize: 11)),
+                  ])),
+                  Icon(Icons.chevron_right, color: Colors.white70),
+                ]),
+              ),
+            ),
+            const SizedBox(height: 8),
             _actionCard(context, 'Search Citizen',
                 'Find citizen by CNIC, name or city',
                 Icons.search, AppTheme.success, () {
